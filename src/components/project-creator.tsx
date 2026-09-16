@@ -753,7 +753,7 @@ export function ProjectCreator({ onProjectCreated }: ProjectCreatorProps) {
                 ) : null}
 
                 {ecuIdentification?.ecu_type === "MG1CS003" && (
-                  <p className="text-sm">MG1 reference software identified. Create the project, then import the matching XDF to view and edit tables. Checksum and flash validation are unavailable.</p>
+                  <p className="text-sm">MG1 reference software identified. Create the project, then import the matching A2L, XDF or ZedSuite definitions to view and edit tables. Checksum and flash validation are unavailable.</p>
                 )}
                 {/* ECU Identification Display */}
                 {isAnalyzing ? (

@@ -8715,6 +8715,7 @@ await axios.put("/api/versioning/map-edits", { versionId: currentVersionId, edit
           onClose={closeMappackExportModal}
           onConfirm={handleConfirmMappackExport}
           cost={mappackPrice}
+          nativeFormat={projectData?.ecu_type === "MG1CS003"}
           isClosing={isMappackExportModalClosing}
           isExporting={isExportingMappack}
           exportComplete={isMappackExportComplete}

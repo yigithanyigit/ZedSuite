@@ -12,6 +12,6 @@ export function calibrationDefinitionKey(definition: object): string {
 }
 
 export function retainedDefinitions<T extends { external_source?: string | null }>(maps: T[], format: string): T[] {
-  const replacesImported = format === "A2L" || maps.some((map) => map.external_source === "A2L");
+  const replacesImported = ["A2L", "ZedSuite"].includes(format) || maps.some((map) => ["A2L", "ZedSuite"].includes(map.external_source || ""));
   return maps.filter((map) => replacesImported ? !map.external_source : map.external_source !== format);
 }

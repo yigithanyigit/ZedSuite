@@ -3,6 +3,7 @@
 // `commands.rs` exposes it to the frontend through Tauri IPC commands.
 
 pub mod a2l_import;
+pub mod native_mappack;
 pub mod commands;
 pub mod detector;
 pub mod mappack_import;

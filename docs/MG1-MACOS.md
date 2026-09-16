@@ -153,7 +153,32 @@ The cursor address display was corrected to use the same storage layout and
 extraction mirrors as the editor; the native UI showed 0x680E6E for the
 selected test cell. No vehicle calibration was proposed or flashed.
 
-The separate WinOLS-style map-definition export still needs MG1 validation:
-its current serializer assumes 16-bit axes and does not retain all A2L
-storage metadata. The native BIN export checks above do not cover that
-auxiliary definition-export path.
+MG1 map-definition export uses `.zedsuite.json`, a native format that retains
+cell and axis types, endian flags, column order, numeric conversions, units
+and exclusion reports. It contains definitions, not ROM bytes. This format
+is intended for ZedSuite reimport; it is not advertised as a WinOLS pack.
+The original WinOLS exporter remains available for other ECU families.
+
+Exports are validated through the same native importer before saving. Import
+requires the reference software markers and image size, bounds-checks all
+cells and axes, and rejects invalid conversions or unsupported format versions.
+JSON parsing enables exact float round trips; signed zero is normalized by
+JavaScript JSON serialization but has no effect on these affine conversions.
+
+Private integration tests exported and reimported all 357 A2L entries and all
+842 XDF entries against each of the stock, 250, 280 and 300 binaries. Every
+serialized metadata field was preserved except the explicit source label,
+which becomes ZedSuite. This is metadata fidelity, not validation of errors
+in the original definition files. Wrong software, size and format versions
+were rejected. Run the cross-language tests after building the examples:
+
+```sh
+cargo build --manifest-path src-tauri/Cargo.toml --examples
+MG_REFERENCE_DIR=/path/to/remaps node --test tests/native-mappack.test.mjs
+```
+
+Native UI verification exported the 357-entry A2L project to ZedSuite JSON
+and reimported that exact file into a fresh reference project. All metadata
+and 42 exclusion reasons matched the exported pack. The copied baseline
+remained byte-identical, and an imported float32 constant displayed 125.0,
+matching an independent big-endian IEEE-754 decode.

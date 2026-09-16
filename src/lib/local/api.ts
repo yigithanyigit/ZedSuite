@@ -12,6 +12,7 @@
 // the local app has no limits.
 
 import * as store from "./store";
+import { serializeNativeMappack } from "../native-mappack";
 import { retainedDefinitions } from "../calibration-definition";
 import { detectMaps, importMapDefinitions, bytesToBase64, SUPPORTED_ECUS } from "./detector";
 import { type MappackDisplaySettings,
@@ -302,7 +303,7 @@ export async function handleLocalApi(
           fileDataBase64,
           fileName,
           romSize: binary.length,
-          romDataBase64: fileName.toLowerCase().endsWith(".a2l") ? bytesToBase64(binary) : undefined,
+          romDataBase64: bytesToBase64(binary),
         });
       } catch (e: any) {
         return error(400, String(e?.message || e || "import_failed"));
@@ -437,6 +438,21 @@ export async function handleLocalApi(
         return source === want;
       });
       if (exportMaps.length === 0) return error(400, "no_maps");
+
+      if (fileRecord.ecu_type === "MG1CS003") {
+        const binary = await store.readBinary(fileId);
+        if (!binary) return error(404, "no_binary_data");
+        const reports = (detection as any).definition_reports || {};
+        const bytes = serializeNativeMappack(exportMaps, binary.length, reports[want] || []);
+        await importMapDefinitions({ fileDataBase64: bytesToBase64(bytes), fileName: "definitions.zedsuite.json",
+          romSize: binary.length, romDataBase64: bytesToBase64(binary) });
+        const name = (fileRecord.project_name || "project").replace(/[\\/:*?"<>|]/g, "_");
+        return { status: 200, body: bytes, headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "X-Mappack-Filename": encodeURIComponent(`${name}.zedsuite.json`),
+          "X-Maps-Count": String(exportMaps.length),
+        } };
+      }
 
       // Tri : celui mémorisé avec le projet, sinon celui transmis par l'éditeur
       // (adresse/nom) — le mappack reprend l'ordre affiché dans la liste des maps

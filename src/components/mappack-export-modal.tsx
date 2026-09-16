@@ -10,6 +10,7 @@ interface MappackExportModalProps {
   onClose: () => void;
   onConfirm: () => void;
   cost: number;
+  nativeFormat?: boolean;
   isClosing?: boolean;
   isExporting?: boolean;
   exportComplete?: boolean;
@@ -19,6 +20,7 @@ export function MappackExportModal({
   onClose,
   onConfirm,
   cost,
+  nativeFormat = false,
   isClosing = false,
   isExporting = false,
   exportComplete = false,
@@ -91,7 +93,7 @@ export function MappackExportModal({
             {!isExporting && !exportComplete && (
               <div className="mt-4 text-center space-y-1">
                 <p className="text-sm" style={{ color: L ? 'rgba(0, 0, 0, 0.55)' : 'rgba(255, 255, 255, 0.6)' }}>
-                  {t.mappackExport.description}
+                  {nativeFormat ? "Export ZedSuite definitions with exact cell types, axis encodings and storage order. Reimport this JSON into ZedSuite with the matching BIN." : t.mappackExport.description}
                 </p>
                 {/* Local app: export is free and unlimited — the cost line only
                     shows when a cost is actually configured (never by default) */}

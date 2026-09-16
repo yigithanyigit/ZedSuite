@@ -168,7 +168,16 @@ pub fn import_map_definitions(
         ("XDF", crate::xdf_import::parse_xdf(&text, rom_size))
     } else if crate::mappack_import::looks_like_json(&data) {
         let text = String::from_utf8_lossy(&data);
-        ("JSON", crate::mappack_import::parse_mappack(&text, rom_size)?)
+        let root: serde_json::Value = serde_json::from_slice(&data).map_err(|e| e.to_string())?;
+        if root.get("format").and_then(|v| v.as_str()).is_some_and(|v| v.starts_with("ZedSuite")) {
+            let binary = decode_base64(rom_data_base64.as_deref().ok_or("native import requires the project binary")?)?;
+            if binary.len() != rom_size as usize { return Err("project binary size mismatch".into()); }
+            let result = crate::native_mappack::parse(&data, &binary)?;
+            rejected = result.1;
+            ("ZedSuite", result.0)
+        } else {
+            ("JSON", crate::mappack_import::parse_mappack(&text, rom_size)?)
+        }
     } else {
         return Err("unsupported definition file".to_string());
     };
