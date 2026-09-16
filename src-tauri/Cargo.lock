@@ -3,6 +3,28 @@
 version = 4
 
 [[package]]
+name = "a2lfile"
+version = "3.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "66b919d5d2959281846a4f0ff0eefb1fb98fbbf1a630f050a534431a5d503602"
+dependencies = [
+ "a2lmacros",
+ "fnv",
+ "num-traits",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "a2lmacros"
+version = "3.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cc77d245dcf8a4f9778211028972f706425ea4856cd43d5a3b1373d771eb5c1a"
+dependencies = [
+ "proc-macro2",
+ "quote",
+]
+
+[[package]]
 name = "adler2"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5556,6 +5578,7 @@ dependencies = [
 name = "zedsuite"
 version = "1.2.3"
 dependencies = [
+ "a2lfile",
  "aes",
  "base64 0.22.1",
  "cbc",

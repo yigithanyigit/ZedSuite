@@ -1,5 +1,6 @@
 "use client";
 
+import { calibrationDefinitionKey } from "@/lib/calibration-definition";
 import { calibrationCellBytes, readCalibrationCell, writeCalibrationCell, type CalibrationEncoding } from "@/lib/calibration-codec";
 
 import { useEffect, useState, useRef, useCallback, useMemo, useDeferredValue } from "react";
@@ -147,6 +148,7 @@ interface MapData extends CalibrationEncoding {
   /** « OLS », « XDF » ou « JSON » : map venue d'un fichier de définitions
    *  importé, et non du détecteur. */
   external_source?: string | null;
+    column_major?: boolean | null;
   /** Points d'axe écrits dans le fichier de définitions au lieu d'être lus
    *  dans le binaire (axe fixe d'un XDF). */
   x_axis_values?: number[] | null;
@@ -4540,6 +4542,10 @@ function EditorPageContent() {
 
   const importDefinitionsFile = async (file: File) => {
     if (!projectData?.fileId) return;
+    if (hasUnsavedChanges || versions.length > 1) {
+      toast({ title: "Import definitions in an unmodified project", description: "Create a separate project from the reference BIN to change definitions without reinterpreting saved or pending edits.", variant: "destructive" });
+      return;
+    }
     setIsImportingDefinitions(true);
     try {
       const buffer = new Uint8Array(await file.arrayBuffer());
@@ -4573,17 +4579,19 @@ function EditorPageContent() {
         return updated;
       });
       if (byteOrder) setProjectByteOrder(byteOrder);
+      setOpenMaps([]);
       clearMapDataCache();
       toast({
         title: t.sidebar.importDefinitions,
         description: (t.upload?.importDefinitionsDone || "{count} map(s) imported from the {format} file")
           .replace("{count}", String(imported))
-          .replace("{format}", String(response.data?.format || "")),
+          .replace("{format}", String(response.data?.format || "")) +
+          (response.data?.rejected?.length ? `; ${response.data.rejected.length} definitions skipped. See the import report.` : ""),
       });
     } catch (error: any) {
       toast({
         title: t.errors.importDefinitionsFailed,
-        description: t.errors.importDefinitionsFailedDescription,
+        description: error?.response?.data?.error || t.errors.importDefinitionsFailedDescription,
         variant: "destructive",
       });
     } finally {
@@ -6008,10 +6016,18 @@ await axios.put("/api/versioning/map-edits", { versionId: currentVersionId, edit
     }
   };
 
+  const openedDefinitions = useRef(new Map<number, string>());
   const handleMapClick = (map: MapData) => {
     // Block map clicks when mappack is locked
     if (!mappackUnlocked) return;
 
+    const definitionKey = calibrationDefinitionKey(map);
+    const previousDefinition = openedDefinitions.current.get(map.address);
+    if (previousDefinition && previousDefinition !== definitionKey && Object.keys(allMapModifications.get(map.address) || {}).length) {
+      toast({ title: "Definition switch paused", description: "Save or discard this table's edits before opening a different definition at the same address.", variant: "destructive" });
+      return;
+    }
+    openedDefinitions.current.set(map.address, definitionKey);
     setOpenMaps((prev) => {
       // Si déjà ouverte, on la remet en haut de pile
       const exists = prev.some((m) => m.address === map.address);
@@ -7287,6 +7303,14 @@ await axios.put("/api/versioning/map-edits", { versionId: currentVersionId, edit
                     {t.sidebar.importDefinitions}
                   </span>
                 </button>
+                {Object.entries((projectData?.detectionResults as any)?.definition_reports || {}).map(([format, reasons]) => (
+                  <details key={format} className="px-2 py-1 text-xs">
+                    <summary>{format} import report: {(reasons as string[]).length} skipped</summary>
+                    <ul className="max-h-48 overflow-auto break-words space-y-1 mt-2">
+                      {(reasons as string[]).map((reason, index) => <li key={index}>{reason}</li>)}
+                    </ul>
+                  </details>
+                ))}
               </div>
             )}
           </div>
@@ -7873,7 +7897,7 @@ await axios.put("/api/versioning/map-edits", { versionId: currentVersionId, edit
                       >
                         <div className="flex-1 bg-transparent relative overflow-hidden">
                           <MapViewer
-                            key={map.address}
+                            key={calibrationDefinitionKey(map)}
                             mapData={map}
                             fileData={projectData.file_data}
                             projectName={projectData.project_name}

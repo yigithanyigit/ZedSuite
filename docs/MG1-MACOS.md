@@ -1,7 +1,7 @@
 # MG1 reference workflow on macOS
 
 This fork adds native Rust import of the verified MG Flasher `.custom`
-container and explicit XDF cell/axis encoding in the editor. It is an offline
+container and explicit XDF/A2L cell/axis encoding in the editor. It is an offline
 editor, not an ECU simulator or a validated MG1 flashing tool.
 
 ## Supported reference
@@ -35,11 +35,26 @@ These are partial definitions. The XDF contains 718 tables and 124 constants;
 entries, including repeated axis definitions, not 842 independently verified
 ECU functions. Faithful XDF import does not validate the author's units,
 conversion factors, map semantics or applicability to custom-code overlays.
-Previously identified XDF/A2L discrepancies still require review. This fork
-does not yet import A2L directly.
+Native A2L import is limited to the exact reference definition SHA-256
+`f5d56122110007ec120f67427108be2ed82e09bd730ec9a131266847fe3de0e4`
+and the reference software markers. It resolves record alignment, inline and
+shared axes, affine RAT_FUNC conversion, explicit byte order and ROW_DIR /
+COLUMN_DIR storage. The A2L's internal version header is stale; its header
+alone is not sufficient for matching a binary.
+
+Of 399 characteristics, 357 numeric entries import. The report lists 42
+excluded entries: 27 refer to an absent conversion, six use verbal tables,
+and nine have unresolved A2L/XDF axis-address conflicts. These exclusions
+are stored with the project and shown below the import button. Failed or
+empty imports preserve existing maps. Importing A2L replaces previously imported definitions. Importing another
+format into an A2L project likewise replaces the A2L definitions: the editor
+must not resolve two incompatible encodings at one address. Definition
+changes require an unmodified project with only its original version, so
+saved edits are not reinterpreted using a different definition. Use separate
+projects to inspect A2L and XDF side by side.
 
 Open a BIN, or open a `.custom` file and enter its VIN. Create the project,
-then choose **Import map definitions** and select the matching XDF. Search
+then choose **Import map definitions** and select the matching A2L or XDF. Search
 by title, symbol (description), or hexadecimal address. Reimport definitions
 in projects created with older builds to obtain the corrected metadata.
 
@@ -54,8 +69,14 @@ in projects created with older builds to obtain the corrected metadata.
 - Disposable UI edit at displayed 6950 RPM / 180% load changed only the two
   expected bytes at 0x6BC182, from 0x0CF5 to 0x0E00 (lambda 0.875).
   This was an editor test, not a proposed calibration. The value was restored.
-- 56 standard Rust tests passed, plus the private reference test; TypeScript
-  checking and both codec tests passed.
+- 59 standard Rust tests passed, plus the private A2L import test over stock,
+  250, 280 and 300. TypeScript and five codec/layout tests passed.
+- A2L output matched 729 numeric parts from the independent Python workbench
+  on all four binaries: addresses, types, endian flags, units and affine
+  conversions had zero discrepancies. This covers supported metadata, not
+  every ECU function or the correctness of the definition author's semantics.
+- A non-square synthetic matrix verifies COLUMN_DIR display indexing and
+  that a write reaches precisely the selected cell.
 - Unit tests cover integer signs, byte order, 32-bit and floating-point data,
   scaled writes, bounds, overflow and unsupported XDF layouts/conversions.
 
@@ -68,7 +89,7 @@ and power cannot be established by the editor or a table-only simulation.
 ```sh
 npm ci
 cargo test --manifest-path src-tauri/Cargo.toml --lib
-node --test tests/calibration-codec.test.mjs
+node --test tests/calibration-codec.test.mjs tests/map-cell-layout.test.mjs
 npx tsc --noEmit
 npm run tauri -- build --debug --bundles app
 ```
@@ -77,7 +98,7 @@ Private fixtures stay outside the repository:
 
 ```sh
 MG_REFERENCE_DIR=/path/to/remaps cargo test --manifest-path src-tauri/Cargo.toml \
-  --lib matches_private_reference_bins -- --ignored
+  --lib private_reference -- --ignored
 ```
 
 The fixture directory contains `dbj_{250,280,300}.custom`, the stock
@@ -109,11 +130,19 @@ constant-unit import: 100 unit-text differences, 15 conversion differences,
 and three storage-type disagreements (categories overlap). Unit-text
 inequality includes notation differences and is not automatically a physical
 unit error. The three `EngDa_*` constants are declared float32 by the A2L but
-signed int32 by the XDF. They must not be treated as verified editable
-calibrations until the definitions are reconciled.
+signed int32 by the XDF. The A2L importer uses the declared float32 encoding; the XDF tree retains
+its own declaration. Their physical meaning is not established by import tests.
 
 Version reconstruction now propagates failures to a visible comparison error
 instead of returning partial data or attempting a raw-value fallback. Copying
 imported maps uses their explicit storage encoding, including signed and
 32-bit values. The audit script/report remain in the local analysis workspace;
 vehicle data and definition files are not redistributed with the fork.
+
+Native A2L UI import was verified on the 250 reference: the 357 entries and
+42 exclusions appeared, and KF_LABAS_1 rendered with RPM/load axes. Decode
+cache identity includes definition metadata, preventing reuse across differing
+encodings at one address. The final native build also replaced the prior XDF tree on reimport and
+exported the unmodified 250 BIN byte-for-byte identically to its baseline.
+A2L UI edit/save/reopen checks remain to be completed; the earlier single-cell
+UI byte check used XDF.

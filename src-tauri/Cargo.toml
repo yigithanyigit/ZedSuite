@@ -33,6 +33,7 @@ base64 = "0.22"
 log = "0.4"
 # Update system: GitHub releases check + installer download
 reqwest = { version = "0.12", features = ["json"] }
+a2lfile = { version = "3.5.0", default-features = false }
 
 # Thin LTO + parallel codegen: release builds in ~1-1.5 min instead of 4-5.
 # For a final published release you can temporarily switch to the maximum

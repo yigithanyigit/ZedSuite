@@ -1,5 +1,6 @@
 ﻿+"use client";
 
+import { calibrationDefinitionKey } from "@/lib/calibration-definition";
 import { calibrationCellBytes, readCalibrationCell, writeCalibrationCell, type CalibrationEncoding } from "@/lib/calibration-codec";
 
 import { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from "react";
@@ -415,6 +416,7 @@ interface MapViewerProps {
     /** « OLS », « XDF » ou « JSON » : map venue d'un fichier de définitions
      *  importé. Sa disposition est celle que le fichier déclare. */
     external_source?: string | null;
+    column_major?: boolean | null;
     /** Points d'axe écrits dans le fichier de définitions au lieu d'être lus
      *  dans le binaire (axe fixe d'un XDF TunerPro). */
     x_axis_values?: number[] | null;
@@ -2154,7 +2156,7 @@ const [axesSwapped, setAxesSwapped] = useState<boolean>(false); // Track if axes
   // Utiliser useMemo pour m├®moriser les donn├®es extraites et ├®viter les recalculs
   const extractedData = useMemo(() => {
     // V├®rifier le cache d'abord
-    const cacheKey = getCacheKey(mapData.address, projectName, fileName);
+    const cacheKey = getCacheKey(mapData.address, projectName, fileName) + calibrationDefinitionKey(mapData);
     const fileDataHash = getFileDataHash(fileData, mapData.address);
     const cached = mapDataCache.get(cacheKey);
 

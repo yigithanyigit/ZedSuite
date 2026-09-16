@@ -12,7 +12,8 @@
 // the local app has no limits.
 
 import * as store from "./store";
-import { detectMaps, importMapDefinitions, SUPPORTED_ECUS } from "./detector";
+import { retainedDefinitions } from "../calibration-definition";
+import { detectMaps, importMapDefinitions, bytesToBase64, SUPPORTED_ECUS } from "./detector";
 import { type MappackDisplaySettings,
   buildWinolsMappack,
   serializeWinolsMappack,
@@ -301,22 +302,26 @@ export async function handleLocalApi(
           fileDataBase64,
           fileName,
           romSize: binary.length,
+          romDataBase64: fileName.toLowerCase().endsWith(".a2l") ? bytesToBase64(binary) : undefined,
         });
       } catch (e: any) {
         return error(400, String(e?.message || e || "import_failed"));
       }
 
+      if (!imported.maps.length) {
+        return error(400, "No supported definitions were found; existing maps were kept.");
+      }
+
       const previous = typeof fileRecord.detection_data === "string"
         ? JSON.parse(fileRecord.detection_data)
         : (fileRecord.detection_data as any) || {};
-      const kept = (previous?.maps || []).filter(
-        (mp: any) => (mp?.external_source || null) !== imported.format
-      );
+      const kept = retainedDefinitions(previous?.maps || [], imported.format);
       const results = {
         ...previous,
         success: true,
         maps: [...kept, ...(imported.maps || [])],
         total_maps: kept.length + (imported.maps?.length || 0),
+        definition_reports: { [imported.format]: imported.rejected || [] },
       };
 
       const patch: any = {
@@ -335,6 +340,7 @@ export async function handleLocalApi(
         success: true,
         format: imported.format,
         imported: imported.maps?.length || 0,
+        rejected: imported.rejected || [],
         replaced: (previous?.maps || []).length - kept.length,
         byteOrder: patch.byte_order ?? fileRecord.byte_order ?? null,
         detectionResults: results,

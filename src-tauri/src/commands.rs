@@ -130,6 +130,7 @@ pub struct ImportDefinitionsResponse {
     pub format: String,
     pub total_maps: usize,
     pub maps: Vec<DetectedMap>,
+    pub rejected: Vec<String>,
     /// Ordre des octets décrit par les définitions, « hilo » ou « lohi »,
     /// à retenir sur le projet : le fichier est le seul à le dire quand le
     /// calculateur n'est pas reconnu.
@@ -147,6 +148,7 @@ pub fn import_map_definitions(
     file_data_base64: String,
     file_name: String,
     rom_size: u32,
+    rom_data_base64: Option<String>,
 ) -> Result<ImportDefinitionsResponse, String> {
     let start = Instant::now();
     let data = decode_base64(&file_data_base64)?;
@@ -154,7 +156,14 @@ pub fn import_map_definitions(
         return Err("empty file".to_string());
     }
 
-    let (format, maps) = if crate::xdf_import::looks_like_xdf(&data) {
+    let mut rejected = Vec::new();
+    let (format, maps) = if file_name.to_ascii_lowercase().ends_with(".a2l") {
+        let binary = decode_base64(rom_data_base64.as_deref().ok_or("A2L import requires the project binary")?)?;
+        if binary.len() != rom_size as usize { return Err("project binary size mismatch".into()); }
+        let result = crate::a2l_import::parse_reference(&data, &binary)?;
+        rejected = result.rejected;
+        ("A2L", result.maps)
+    } else if crate::xdf_import::looks_like_xdf(&data) {
         let text = crate::xdf_import::decode_text(&data);
         ("XDF", crate::xdf_import::parse_xdf(&text, rom_size))
     } else if crate::mappack_import::looks_like_json(&data) {
@@ -178,6 +187,7 @@ pub fn import_map_definitions(
         format: format.to_string(),
         total_maps: maps.len(),
         maps,
+        rejected,
         byte_order,
         processing_time_ms: start.elapsed().as_millis(),
     })

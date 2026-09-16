@@ -2,6 +2,7 @@
 // The detection engine lives in `detector/` (one module per ECU manufacturer);
 // `commands.rs` exposes it to the frontend through Tauri IPC commands.
 
+pub mod a2l_import;
 pub mod commands;
 pub mod detector;
 pub mod mappack_import;

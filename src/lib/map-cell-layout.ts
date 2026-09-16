@@ -27,6 +27,7 @@ export interface MapLayoutInput {
    * elles ne valent que pour les maps que le détecteur nomme lui-même.
    */
   external_source?: string | null;
+  column_major?: boolean | null;
   dimensions?: {
     TwoDimensional?: { rows: number; cols: number };
     OneDimensional?: { length: number };
@@ -176,7 +177,7 @@ export function resolveMapCellLayout(map: MapLayoutInput): MapCellLayout {
       cols: apiCols,
       cellBytes: calibrationCellBytes(map.data_type),
       axesSwapped: false,
-      cellIndex: (row: number, col: number) => row * apiCols + col,
+      cellIndex: (row: number, col: number) => map.column_major ? col * apiRows + row : row * apiCols + col,
     };
   }
 

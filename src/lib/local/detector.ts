@@ -119,6 +119,7 @@ export async function extractOlsMaps(fileDataBase64: string): Promise<DetectionR
 }
 
 export interface ImportedDefinitions {
+  rejected: string[];
   success: boolean;
   /** « XDF » (TunerPro) ou « JSON » (mappack), tel que reconnu dans le fichier. */
   format: string;
@@ -140,11 +141,13 @@ export async function importMapDefinitions(args: {
   fileDataBase64: string;
   fileName: string;
   romSize: number;
+  romDataBase64?: string;
 }): Promise<ImportedDefinitions> {
   return invoke<ImportedDefinitions>("import_map_definitions", {
     fileDataBase64: args.fileDataBase64,
     fileName: args.fileName,
     romSize: args.romSize,
+    romDataBase64: args.romDataBase64,
   });
 }
 

@@ -18,6 +18,8 @@ pub struct DetectedMap {
     pub x_axis_encoding: Option<AxisEncoding>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub y_axis_encoding: Option<AxisEncoding>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub column_major: Option<bool>,
     pub x_axis_address: Option<u32>,
     pub y_axis_address: Option<u32>,
     pub correction_factor: Option<f64>,
@@ -205,6 +207,7 @@ impl DetectedMap {
             unit: None,
             description: None,
             confidence: 0.0,
+            column_major: None,
             x_axis_encoding: None,
             y_axis_encoding: None,
             x_axis_address: None,
