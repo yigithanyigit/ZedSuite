@@ -1,5 +1,7 @@
 "use client";
 
+import { calibrationCellBytes, readCalibrationCell, writeCalibrationCell, type CalibrationEncoding } from "@/lib/calibration-codec";
+
 import { useEffect, useState, useRef, useCallback, useMemo, useDeferredValue } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -100,7 +102,7 @@ const Plot = dynamic(() => import("react-plotly.js"), {
   loading: () => null,
 });
 
-interface MapData {
+interface MapData extends CalibrationEncoding {
   name: string;
   address: number;
   size: number;
@@ -122,6 +124,8 @@ interface MapData {
     };
   };
   // Axis addresses and correction factors
+  x_axis_encoding?: CalibrationEncoding;
+  y_axis_encoding?: CalibrationEncoding;
   x_axis_address?: number;
   y_axis_address?: number;
   x_axis_correction?: number;
@@ -3057,6 +3061,7 @@ function EditorPageContent() {
       labels: string[],
       correction: number | undefined,
       offset: number | undefined,
+      encoding?: CalibrationEncoding,
     ) => {
       if (addr === undefined || addr <= 0) return;
       const corr = correction ?? 1.0;
@@ -3064,6 +3069,10 @@ function EditorPageContent() {
       for (let i = 0; i < labels.length; i++) {
         const value = Number(String(labels[i]).trim().replace(',', '.'));
         if (!Number.isFinite(value)) continue;
+        if (encoding) {
+          writeCalibrationCell(data, addr + i * calibrationCellBytes(encoding.data_type), encoding, value, corr, off);
+          continue;
+        }
         let raw = Math.round((value - off) / (corr || 1));
         if (raw < 0) raw = raw + 65536;
         raw = raw & 0xFFFF;
@@ -3122,10 +3131,10 @@ function EditorPageContent() {
         }
       }
       if (axes.x && axes.x.length > 0) {
-        writeAxis(xAddr, axes.x, xCorrection, xOffset);
+        writeAxis(xAddr, axes.x, xCorrection, xOffset, mapInfo.x_axis_encoding);
       }
       if (axes.y && axes.y.length > 0) {
-        writeAxis(yAddr, axes.y, yCorrection, yOffset);
+        writeAxis(yAddr, axes.y, yCorrection, yOffset, mapInfo.y_axis_encoding);
       }
     });
 
@@ -3174,6 +3183,10 @@ function EditorPageContent() {
         const byteAddress = mapAddress + linearOffset;
         if (byteAddress < 0 || byteAddress + cellSize > data.length) return;
 
+        if (mapInfo.external_source) {
+          writeCalibrationCell(data, byteAddress, mapInfo, displayValue, correction, offsetValue);
+          return;
+        }
         // Inverse of the decode in MapViewer: displayValue = raw * correction + offset
         let raw = Math.round((displayValue - offsetValue) / correction);
 
@@ -6370,7 +6383,7 @@ await axios.put("/api/versioning/map-edits", { versionId: currentVersionId, edit
     if (!mapSearchTerm) return true;
     const name = (map.name || "").toLowerCase();
     const addr = (map.address || 0).toString(16).toLowerCase();
-    return name.includes(mapSearchTerm) || addr.includes(mapSearchTerm.replace(/^0x/, ""));
+    return name.includes(mapSearchTerm) || (map.description || "").toLowerCase().includes(mapSearchTerm) || addr.includes(mapSearchTerm.replace(/^0x/, ""));
   };
 
   /** Projet sans détecteur derrière lui : les maps viennent du projet WinOLS

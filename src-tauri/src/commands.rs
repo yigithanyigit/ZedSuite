@@ -36,6 +36,14 @@ pub fn identify_ecu(
     let data = decode_base64(&file_data_base64)?;
     log::warn!("🔍 [IDENTIFY-ECU] file: {} ({} bytes)", file_name, data.len());
 
+    if crate::mg_custom::matches_reference_software(&data) {
+        return Ok(IdentifyEcuResponse {
+            manufacturer: "Bosch".into(), ecu_type: "MG1CS003".into(),
+            variant: Some("DME8.4; external definitions required".into()),
+            software_version: Some("R0R9A005B / 7706-000.011.005".into()),
+            hardware_version: None, part_number: None, confidence: 1.0,
+        });
+    }
     let ecu_id = ECUIdentifier::identify(&data);
 
     log::warn!(
@@ -147,7 +155,7 @@ pub fn import_map_definitions(
     }
 
     let (format, maps) = if crate::xdf_import::looks_like_xdf(&data) {
-        let text = String::from_utf8_lossy(&data);
+        let text = crate::xdf_import::decode_text(&data);
         ("XDF", crate::xdf_import::parse_xdf(&text, rom_size))
     } else if crate::mappack_import::looks_like_json(&data) {
         let text = String::from_utf8_lossy(&data);

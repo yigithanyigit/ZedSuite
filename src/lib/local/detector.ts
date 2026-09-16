@@ -171,3 +171,9 @@ export function bytesToBase64(bytes: Uint8Array): string {
   }
   return btoa(chunks.join(""));
 }
+
+export async function decodeMgCustom(fileDataBase64: string, vin: string) {
+  return invoke<{ data_base64: string; sha256: string; bytes: number }>("decode_mg_custom", {
+    fileDataBase64, vin,
+  });
+}

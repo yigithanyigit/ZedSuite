@@ -6,6 +6,7 @@ pub mod commands;
 pub mod detector;
 pub mod mappack_import;
 pub mod models;
+pub mod mg_custom;
 pub mod ols_import;
 pub mod ols_maps;
 pub mod update;
@@ -83,6 +84,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::identify_ecu,
+            mg_custom::decode_mg_custom,
             commands::inspect_ols_container,
             commands::extract_ols_version,
             commands::extract_ols_maps,

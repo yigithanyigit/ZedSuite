@@ -1144,6 +1144,8 @@ impl EDC15PDetector {
                                         map_offset, t, axis2_offset);
 
                                     let start_iq = DetectedMap {
+                                        x_axis_encoding: None,
+                                        y_axis_encoding: None,
                                         id: format!("siq_{:06X}", map_offset),
                                         address: map_offset as u32,
                                         size: map_size,
@@ -2040,6 +2042,8 @@ impl EDC15PDetector {
                 } else {
                     // Create new map
                     let boost_corr = DetectedMap {
+                                        x_axis_encoding: None,
+                                        y_axis_encoding: None,
                         id: format!("bcbt_{:06X}", map_start),
                         address: map_start as u32,
                         size: map_size,
@@ -2170,6 +2174,8 @@ impl EDC15PDetector {
             }
             if !updated {
                 let iq_iat = DetectedMap {
+                                        x_axis_encoding: None,
+                                        y_axis_encoding: None,
                     id: format!("iqiat_{:06X}", map_start),
                     address: map_start as u32,
                     size: map_size,
@@ -2281,6 +2287,8 @@ impl EDC15PDetector {
                 map_start, larger_len, smaller_len);
 
             let driver_wish = DetectedMap {
+                                        x_axis_encoding: None,
+                                        y_axis_encoding: None,
                 id: format!("dw_{:06X}", map_start),
                 address: map_start as u32,
                 size: map_size,
@@ -2495,6 +2503,8 @@ impl EDC15PDetector {
                                                         };
 
                                                         let smoke_map = DetectedMap {
+                                        x_axis_encoding: None,
+                                        y_axis_encoding: None,
                                                             id: format!("smoke_{:06X}", map_addr),
                                                             address: map_addr as u32,
                                                             size: map_size,
@@ -2545,6 +2555,8 @@ impl EDC15PDetector {
                                 let map_addr = z_offset;
                                 if !detected_addresses.contains(&(map_addr as u32)) && map_addr + map_size <= data.len() {
                                     let smoke_map = DetectedMap {
+                                        x_axis_encoding: None,
+                                        y_axis_encoding: None,
                                         id: format!("smoke_{:06X}", map_addr),
                                         address: map_addr as u32,
                                         size: map_size,

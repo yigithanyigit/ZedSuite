@@ -27,7 +27,7 @@ use serde::Serialize;
 use std::io::Write;
 use tauri::Emitter;
 
-const GITHUB_REPO: &str = "LeZed97/ZedSuite";
+const GITHUB_REPO: &str = "yigithanyigit/ZedSuite";
 
 #[derive(Debug, Clone, Serialize)]
 pub struct UpdateInfo {

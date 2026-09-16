@@ -11,7 +11,7 @@ import { useRouter } from "next/navigation";
 import axios from "axios";
 import { MODAL_GLASS, MODAL_GLASS_LIGHT } from "@/lib/modal-glass";
 import { useThemeOptional } from "@/contexts/theme-context";
-import { identifyEcu, detectMaps, inspectOlsContainer, extractOlsVersion, extractOlsMaps, type OlsVersionInfo, type OlsInspection } from "@/lib/local/detector";
+import { decodeMgCustom, identifyEcu, detectMaps, inspectOlsContainer, extractOlsVersion, extractOlsMaps, type OlsVersionInfo, type OlsInspection } from "@/lib/local/detector";
 import * as localStore from "@/lib/local/store";
 import ZedGradientDefs, { ZedFileIcon } from "@/components/zed-gradient-defs";
 // Listes déroulantes au style de l'app (même composant que la langue des paramètres)
@@ -54,6 +54,9 @@ export function ProjectCreator({ onProjectCreated }: ProjectCreatorProps) {
   const { t } = useI18n();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [pendingCustom, setPendingCustom] = useState<{ data: string; name: string } | null>(null);
+  const [customVin, setCustomVin] = useState("");
+  const [customError, setCustomError] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [ecuIdentification, setEcuIdentification] = useState<ECUIdentification | null>(null);
   // Pourquoi le calculateur n'est pas pris en charge, quand il ne l'est pas :
@@ -149,6 +152,9 @@ export function ProjectCreator({ onProjectCreated }: ProjectCreatorProps) {
 
   const analyzeECUType = async (file: File) => {
     setIsAnalyzing(true);
+    fileBase64Ref.current = null;
+    setPendingCustom(null);
+    setCustomError("");
     try {
       // Read file and encode as base64 using chunked approach (fast for large files)
       const arrayBuffer = await file.arrayBuffer();
@@ -159,6 +165,13 @@ export function ProjectCreator({ onProjectCreated }: ProjectCreatorProps) {
         chunks.push(String.fromCharCode(...uint8Array.subarray(i, i + chunkSize)));
       }
       const fileDataBase64 = btoa(chunks.join(''));
+      if (file.name.toLowerCase().endsWith(".custom")) {
+        setOlsProject(null);
+        setPendingOlsChoice(null);
+        setPendingCustom({ data: fileDataBase64, name: file.name });
+        setIsAnalyzing(false);
+        return;
+      }
 
       // A .ols file is a WinOLS PROJECT (metadata header + one or more saved ROM versions), not
       // a raw dump -- identification/detection need the actual ROM bytes of ONE chosen version,
@@ -200,6 +213,12 @@ export function ProjectCreator({ onProjectCreated }: ProjectCreatorProps) {
 
       // Identify the ECU type via the embedded Rust detection engine
       const identResult = await identifyEcu(fileDataBase64, fileName);
+      if (identResult.ecu_type === "MG1CS003") {
+        setEcuIdentification(identResult);
+        setUnsupportedReason("not-detected");
+        setVehicleBrand(prev => prev || "BMW");
+        return;
+      }
 
       // Pris en charge = identifié ET activé dans la base des calculateurs
       const identified = !!(identResult?.ecu_type && identResult.ecu_type !== "Unknown");
@@ -293,7 +312,31 @@ export function ProjectCreator({ onProjectCreated }: ProjectCreatorProps) {
     }
   };
 
+  const openCustom = async () => {
+    if (!pendingCustom) return;
+    setIsAnalyzing(true);
+    setCustomError("");
+    try {
+      const decoded = await decodeMgCustom(pendingCustom.data, customVin.trim().toUpperCase());
+      const bytes = Uint8Array.from(atob(decoded.data_base64), c => c.charCodeAt(0));
+      const name = pendingCustom.name.replace(/\.custom$/i, ".bin");
+      setSelectedFile(new File([bytes], name, { type: "application/octet-stream" }));
+      setPendingCustom(null);
+      setCustomVin("");
+      await identifyAndSetState(decoded.data_base64, name);
+      toast({ title: "Custom map decoded locally", description: `${decoded.bytes.toLocaleString()} bytes. Imported as a BIN for offline editing.` });
+    } catch (error) {
+      setCustomError(String(error));
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
   const handleRemoveFile = () => {
+    setPendingCustom(null);
+    setCustomVin("");
+    setCustomError("");
+    fileBase64Ref.current = null;
     setSelectedFile(null);
     setEcuIdentification(null);
     setUnsupportedReason(null);
@@ -351,7 +394,7 @@ export function ProjectCreator({ onProjectCreated }: ProjectCreatorProps) {
     }
 
     // Block if ECU is disabled (a WinOLS project of an unsupported ECU is allowed: its maps come from the project)
-    if (!ecuIdentification?.ols_maps && ecuIdentification?.ecu_type && ecuIdentification.ecu_type !== "Unknown") {
+    if (!canCreateWithoutDetection && !ecuIdentification?.ols_maps && ecuIdentification?.ecu_type && ecuIdentification.ecu_type !== "Unknown") {
       try {
         const statusRes = await fetch(`/api/ecu-status?ecu_type=${encodeURIComponent(ecuIdentification.ecu_type)}`);
         if (statusRes.ok) {
@@ -652,6 +695,15 @@ export function ProjectCreator({ onProjectCreated }: ProjectCreatorProps) {
                 {/* .ols version picker -- shown instead of the identification block while a
                     multi-version WinOLS project is waiting on the user to pick one saved
                     version (see `pendingOlsChoice`); identification only starts afterwards. */}
+                {pendingCustom && (
+                  <div className="space-y-3 rounded-lg border border-white/20 p-4">
+                    <p className="text-sm">MG Flasher custom file: enter the VIN used to encrypt this map. Decryption runs locally; the VIN is not saved.</p>
+                    <input aria-label="Custom map VIN" className={inputCls} value={customVin} maxLength={17}
+                      onChange={e => setCustomVin(e.target.value.toUpperCase())} autoComplete="off" spellCheck={false} />
+                    {customError && <p role="alert" className="text-sm text-red-400">{customError}</p>}
+                    <Button onClick={openCustom} disabled={isAnalyzing || customVin.trim().length !== 17}>Decode custom map</Button>
+                  </div>
+                )}
                 {pendingOlsChoice ? (
                   <div className={`p-4 border rounded-lg ${L ? "bg-black/[0.03] border-black/10" : "bg-black/15 border-white/20"}`}>
                     <p className={`text-sm font-medium mb-3 ${L ? "text-slate-900" : "text-white"}`}>
@@ -700,6 +752,9 @@ export function ProjectCreator({ onProjectCreated }: ProjectCreatorProps) {
                   </div>
                 ) : null}
 
+                {ecuIdentification?.ecu_type === "MG1CS003" && (
+                  <p className="text-sm">MG1 reference software identified. Create the project, then import the matching XDF to view and edit tables. Checksum and flash validation are unavailable.</p>
+                )}
                 {/* ECU Identification Display */}
                 {isAnalyzing ? (
                   <div className="flex items-center gap-3 p-4 border rounded-lg bg-red-500/10 border-red-500/30">
@@ -986,7 +1041,7 @@ export function ProjectCreator({ onProjectCreated }: ProjectCreatorProps) {
           <div className="flex gap-3 pt-4">
             <Button
               onClick={handleCreateProject}
-              disabled={!selectedFile || !projectName.trim() || isUploading || isAnalyzing || !!pendingOlsChoice || (ecuIdentification?.ecu_type === "Unknown" && !canCreateWithoutDetection)}
+              disabled={!selectedFile || !projectName.trim() || isUploading || isAnalyzing || !!pendingCustom || !!pendingOlsChoice || (ecuIdentification?.ecu_type === "Unknown" && !canCreateWithoutDetection)}
               className="w-full bg-gradient-to-r from-red-600/90 via-red-500/90 to-orange-500/90 hover:from-red-500/90 hover:via-red-400/90 hover:to-orange-400/90 text-white shadow-lg shadow-red-500/20"
               size="lg"
             >

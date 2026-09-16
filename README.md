@@ -1,5 +1,7 @@
 # ZedSuite
 
+This personal fork adds a native macOS MG1 reference workflow. See [MG1 import, validation and limitations](docs/MG1-MACOS.md).
+
 **English** · [Français](README.fr.md)
 
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0078d4) ![Engine](https://img.shields.io/badge/detection%20engine-Rust-e6522c) ![License](https://img.shields.io/badge/license-GPL--3.0-2ea44f) ![Downloads](https://img.shields.io/github/downloads/LeZed97/ZedSuite/total)

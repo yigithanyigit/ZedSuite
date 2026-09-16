@@ -14,6 +14,10 @@ pub struct DetectedMap {
     pub description: Option<String>,
     pub confidence: f32,
     // New fields for axis addresses and correction factors
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub x_axis_encoding: Option<AxisEncoding>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub y_axis_encoding: Option<AxisEncoding>,
     pub x_axis_address: Option<u32>,
     pub y_axis_address: Option<u32>,
     pub correction_factor: Option<f64>,
@@ -201,6 +205,8 @@ impl DetectedMap {
             unit: None,
             description: None,
             confidence: 0.0,
+            x_axis_encoding: None,
+            y_axis_encoding: None,
             x_axis_address: None,
             y_axis_address: None,
             correction_factor: None,
@@ -225,4 +231,10 @@ impl DetectedMap {
             external_source: None,
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AxisEncoding {
+    pub data_type: DataType,
+    pub is_little_endian: bool,
 }

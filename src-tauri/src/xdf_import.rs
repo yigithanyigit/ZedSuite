@@ -20,7 +20,7 @@
 //! cell size, an equation that is not linear, or a block that would fall
 //! outside the binary.
 
-use crate::models::{DataType, DetectedMap, MapDimensions};
+use crate::models::{AxisEncoding, DataType, DetectedMap, MapDimensions};
 
 /// A map definition is only accepted if its whole block fits in the binary.
 const MAX_DIM: u32 = 4096;
@@ -42,6 +42,7 @@ struct Embedded {
     cols: u32,
     flags: u32,
     has_flags: bool,
+    unsupported_stride: bool,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -353,6 +354,8 @@ fn read_embedded(tag: &Tag, defaults: &Defaults) -> Embedded {
         e.flags = v as u32;
         e.has_flags = true;
     }
+    e.unsupported_stride = ["mmedmajorstridebits", "mmedminorstridebits"].iter()
+        .any(|key| tag.attr(key).and_then(parse_num).is_some_and(|v| v != 0));
     e
 }
 
@@ -397,6 +400,13 @@ struct Table {
 /// Reads every map definition of an XDF. `rom_len` is the size of the binary
 /// the definitions apply to: a map that would not fit is left out. Pass 0 to
 /// skip that check.
+pub fn decode_text(data: &[u8]) -> std::borrow::Cow<'_, str> {
+    match std::str::from_utf8(data) {
+        Ok(text) => std::borrow::Cow::Borrowed(text),
+        Err(_) => encoding_rs::WINDOWS_1252.decode(data).0,
+    }
+}
+
 pub fn parse_xdf(xml: &str, rom_len: u32) -> Vec<DetectedMap> {
     let mut reader = XmlReader::new(xml);
     let mut defaults = Defaults { signed: false, lsb_first: false, size_bits: 16 };
@@ -474,6 +484,9 @@ pub fn parse_xdf(xml: &str, rom_len: u32) -> Vec<DetectedMap> {
                 }
 
                 match name.as_str() {
+                    "BASEOFFSET" => {
+                        if tag.attr("offset").and_then(parse_num).is_some_and(|v| v != 0) { return Vec::new(); }
+                    }
                     "DEFAULTS" => {
                         defaults.signed = tag.attr("signed").map(|v| v == "1").unwrap_or(false);
                         defaults.lsb_first = tag.attr("lsbfirst").map(|v| v == "1").unwrap_or(false);
@@ -498,7 +511,7 @@ pub fn parse_xdf(xml: &str, rom_len: u32) -> Vec<DetectedMap> {
                     }
                     "CATEGORYMEM" => {
                         if let (Some(tbl), Some(c)) = (current.as_mut(), tag.attr("category").and_then(parse_num)) {
-                            tbl.categories.push(c as u32);
+                            if c > 0 { tbl.categories.push((c - 1) as u32); }
                         }
                     }
                     "XDFAXIS" => {
@@ -598,9 +611,12 @@ fn to_map(
         return None;
     }
     let z = t.z.as_ref()?;
+    if [t.x.as_ref(), t.y.as_ref(), t.z.as_ref()].into_iter().flatten().any(|a| !a.linear || a.embedded.unsupported_stride) {
+        return None;
+    }
     let address = z.embedded.address?;
     let cell = z.embedded.cell_bytes();
-    if !(1..=4).contains(&cell) {
+    if !matches!(z.embedded.size_bits, 8 | 16 | 32) || !z.linear {
         return None;
     }
 
@@ -658,19 +674,32 @@ fn to_map(
     d.category = Some(folder.clone());
     d.subcategory = Some(folder);
     d.unit = Some(z.units.clone());
-    // A non-linear equation is left unapplied rather than shown wrong.
+    // Unsupported conversions are rejected before constructing a map.
     d.correction_factor = Some(if z.linear { z.factor } else { 1.0 });
     d.offset = Some(if z.linear { z.offset } else { 0.0 });
     d.confidence = 1.0;
     // TunerPro stores little-endian as a flag; ZedSuite reads big-endian by
     // default on EDC16-class ECUs, so the flag travels with the map.
-    if z.embedded.lsb_first(defaults) {
-        d.is_little_endian = Some(true);
-    }
+    d.is_little_endian = Some(z.embedded.lsb_first(defaults));
 
     if let Some(x) = t.x.as_ref() {
         d.x_axis_values = static_values(x, cols);
         d.x_axis_address = x.embedded.address;
+        if x.embedded.address.is_some() {
+            let data_type = match (x.embedded.size_bits, x.embedded.signed(defaults), x.embedded.float()) {
+                (8, false, false) => DataType::UInt8,
+                (8, true, false) => DataType::Int8,
+                (16, false, false) => DataType::UInt16,
+                (16, true, false) => DataType::Int16,
+                (32, _, true) => DataType::Float32,
+                (32, false, false) => DataType::UInt32,
+                (32, true, false) => DataType::Int32,
+                _ => return None,
+            };
+            let count = cols;
+            if rom_len > 0 && x.embedded.address.unwrap() as u64 + count as u64 * x.embedded.cell_bytes() as u64 > rom_len as u64 { return None; }
+            d.x_axis_encoding = Some(AxisEncoding { data_type, is_little_endian: x.embedded.lsb_first(defaults) });
+        }
         d.x_axis_correction = Some(if x.linear { x.factor } else { 1.0 });
         d.x_axis_offset = (x.linear && x.offset != 0.0).then_some(x.offset);
         d.x_label = (!x.units.trim().is_empty()).then(|| x.units.trim().to_string());
@@ -678,6 +707,21 @@ fn to_map(
     if let Some(y) = t.y.as_ref() {
         d.y_axis_values = static_values(y, rows);
         d.y_axis_address = y.embedded.address;
+        if y.embedded.address.is_some() {
+            let data_type = match (y.embedded.size_bits, y.embedded.signed(defaults), y.embedded.float()) {
+                (8, false, false) => DataType::UInt8,
+                (8, true, false) => DataType::Int8,
+                (16, false, false) => DataType::UInt16,
+                (16, true, false) => DataType::Int16,
+                (32, _, true) => DataType::Float32,
+                (32, false, false) => DataType::UInt32,
+                (32, true, false) => DataType::Int32,
+                _ => return None,
+            };
+            let count = rows;
+            if rom_len > 0 && y.embedded.address.unwrap() as u64 + count as u64 * y.embedded.cell_bytes() as u64 > rom_len as u64 { return None; }
+            d.y_axis_encoding = Some(AxisEncoding { data_type, is_little_endian: y.embedded.lsb_first(defaults) });
+        }
         d.y_axis_correction = Some(if y.linear { y.factor } else { 1.0 });
         d.y_axis_offset = (y.linear && y.offset != 0.0).then_some(y.offset);
         d.y_label = (!y.units.trim().is_empty()).then(|| y.units.trim().to_string());
@@ -707,7 +751,7 @@ mod tests {
   <XDFTABLE uniqueid="0x1" flags="0x0">
     <title>Boost target</title>
     <description>Requested boost</description>
-    <CATEGORYMEM index="0" category="0" />
+    <CATEGORYMEM index="0" category="1" />
     <XDFAXIS id="x">
       <EMBEDDEDDATA mmedaddress="0x1000" mmedelementsizebits="16" mmedcolcount="8" />
       <units>rpm</units>
@@ -729,7 +773,7 @@ mod tests {
   </XDFTABLE>
   <XDFCONSTANT uniqueid="0x2">
     <title>Rev limiter</title>
-    <CATEGORYMEM index="0" category="1" />
+    <CATEGORYMEM index="0" category="2" />
     <EMBEDDEDDATA mmedtypeflags="0x03" mmedaddress="0x3000" mmedelementsizebits="8" />
     <units>rpm</units>
     <MATH equation="X * 40"><VAR id="X" /></MATH>
@@ -806,6 +850,27 @@ mod tests {
         assert_eq!(m.y_axis_address, None);
         // Le point vide de l'axe X n'est pas un nombre : l'axe reste numerote
         assert_eq!(m.x_axis_values, None);
+    }
+
+    #[test]
+    fn rejects_unsupported_conversions_and_cell_widths() {
+        for equation in ["X*X", "sqrt(X)"] {
+            let xml = SAMPLE.replace("0.1 * X + 500", equation);
+            assert_eq!(parse_xdf(&xml, 0x10000).len(), 1);
+        }
+        let xml = SAMPLE.replace("mmedelementsizebits=\"16\"", "mmedelementsizebits=\"24\"");
+        assert_eq!(parse_xdf(&xml, 0x10000).len(), 1);
+        let xml = SAMPLE.replace("X/10", "sqrt(X)");
+        assert_eq!(parse_xdf(&xml, 0x10000).len(), 1);
+    }
+
+    #[test]
+    fn preserves_legacy_units_and_rejects_unsupported_layouts() {
+        assert_eq!(decode_text(b"\xb0C"), "°C");
+        let xml = SAMPLE.replace("<deftitle>Test</deftitle>", "<BASEOFFSET offset=\"0x100\" />");
+        assert!(parse_xdf(&xml, 0x10000).is_empty());
+        let xml = SAMPLE.replace("mmedaddress=\"0x2000\"", "mmedaddress=\"0x2000\" mmedminorstridebits=\"32\"");
+        assert_eq!(parse_xdf(&xml, 0x10000).len(), 1);
     }
 
     #[test]

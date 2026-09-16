@@ -1,3 +1,4 @@
+import { calibrationCellBytes } from "./calibration-codec";
 /**
  * Disposition des cellules d'une map : dimensions AFFICHÉES (celles de
  * mapValues / changedCells / selectedCells du MapViewer) et index fichier de
@@ -173,7 +174,7 @@ export function resolveMapCellLayout(map: MapLayoutInput): MapCellLayout {
       apiCols,
       rows: apiRows,
       cols: apiCols,
-      cellBytes: bytesPerCell,
+      cellBytes: calibrationCellBytes(map.data_type),
       axesSwapped: false,
       cellIndex: (row: number, col: number) => row * apiCols + col,
     };

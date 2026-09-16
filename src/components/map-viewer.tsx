@@ -1,5 +1,7 @@
 ﻿+"use client";
 
+import { calibrationCellBytes, readCalibrationCell, writeCalibrationCell, type CalibrationEncoding } from "@/lib/calibration-codec";
+
 import { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { X, Repeat2 } from "lucide-react";
@@ -393,6 +395,8 @@ interface MapViewerProps {
         length: number;
       };
     };
+    x_axis_encoding?: CalibrationEncoding;
+    y_axis_encoding?: CalibrationEncoding;
     x_axis_address?: number;
     y_axis_address?: number;
     correction_factor?: number;
@@ -2490,6 +2494,12 @@ const [axesSwapped, setAxesSwapped] = useState<boolean>(false); // Track if axes
       // Without swap: cols = apiCols, so we read cols values from xAxisAddr (which has apiCols values)
       const expectedXCount = cols; // X axis = columns
       for (let i = 0; i < expectedXCount; i++) {
+        if (mapData.external_source && mapData.x_axis_encoding) {
+          const encoding = mapData.x_axis_encoding;
+          const raw = readCalibrationCell(fileData, xAxisAddr + i * calibrationCellBytes(encoding.data_type), encoding);
+          tempXLabels.push(String(raw * xAxisCorrection + xAxisOffset));
+          continue;
+        }
         const offset = xAxisAddr + (i * 2);
         if (offset + 1 < fileData.length) {
           // Determine endianness for AXIS values
@@ -2581,6 +2591,12 @@ const [axesSwapped, setAxesSwapped] = useState<boolean>(false); // Track if axes
       tempYLabels = [];
       const expectedYCount = rows; // Y axis = rows (after swap: apiCols if swapped, apiRows if not)
       for (let i = 0; i < expectedYCount; i++) {
+        if (mapData.external_source && mapData.y_axis_encoding) {
+          const encoding = mapData.y_axis_encoding;
+          const raw = readCalibrationCell(fileData, yAxisAddr + i * calibrationCellBytes(encoding.data_type), encoding);
+          tempYLabels.push(String(raw * yAxisCorrection + yAxisOffset));
+          continue;
+        }
         const offset = yAxisAddr + (i * 2);
         if (offset + 1 < fileData.length) {
           // Determine endianness for AXIS values
@@ -2701,7 +2717,7 @@ const [axesSwapped, setAxesSwapped] = useState<boolean>(false); // Track if axes
     // maps) store one byte per cell — the stride and decode must follow,
     // otherwise every cell reads two neighboring cells as one 16-bit value.
     const dataTypeStr = String(mapData.data_type || '');
-    const cellBytes = dataTypeStr === 'UInt8' || dataTypeStr === 'Int8' ? 1 : 2;
+    const cellBytes = mapData.external_source ? calibrationCellBytes(dataTypeStr) : (dataTypeStr === 'UInt8' || dataTypeStr === 'Int8' ? 1 : 2);
     if (process.env.NODE_ENV !== 'production' && cellLayout.axesSwapped !== needsAxisSwap) {
       console.warn('[MapViewer] cell layout swap mismatch for', mapData.name, cellLayout.axesSwapped, needsAxisSwap);
     }
@@ -2713,7 +2729,9 @@ const [axesSwapped, setAxesSwapped] = useState<boolean>(false); // Track if axes
         const offset = startAddress + cellLayout.cellIndex(row, col) * cellBytes;
         if (offset + cellBytes - 1 < fileData.length) {
           let rawValue: number;
-          if (cellBytes === 1) {
+          if (mapData.external_source) {
+            rawValue = readCalibrationCell(fileData, offset, mapData);
+          } else if (cellBytes === 1) {
             // 8-bit cells: no endianness, sign only for Int8
             rawValue = fileData[offset];
             if (dataTypeStr === 'Int8' && rawValue > 127) {
