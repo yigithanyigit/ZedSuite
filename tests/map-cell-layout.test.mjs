@@ -44,3 +44,12 @@ test('A2L switching leaves only one imported interpretation for address-based wr
   assert.deepEqual(retainedDefinitions(maps, 'A2L'), [{}]);
   assert.deepEqual(retainedDefinitions([{ external_source: 'A2L' }, {}], 'XDF'), [{}]);
 });
+
+const { selectedMapCellAddress } = await import(`data:text/javascript;base64,${Buffer.from(layoutCode).toString('base64')}`);
+test('cursor addresses undo extraction mirrors before column indexing', () => {
+  const map = { address: 0x680e5c, external_source: 'A2L', column_major: true,
+    data_type: 'UInt16', size: 120, dimensions: { TwoDimensional: { rows: 6, cols: 10 } } };
+  assert.equal(selectedMapCellAddress(map, 2, 1, { rowsReversed: true, colsReversed: false }), 0x680e6e);
+  assert.equal(selectedMapCellAddress(map, 2, 8, { rowsReversed: true, colsReversed: true }), 0x680e6e);
+  assert.throws(() => selectedMapCellAddress(map, 6, 0));
+});

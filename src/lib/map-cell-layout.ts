@@ -355,3 +355,18 @@ export function resolveAxisSources(map: MapAxisSourceInput): MapAxisSources {
   }
   return { x, y, swapped };
 }
+
+export function selectedMapCellAddress(
+  map: MapLayoutInput & { address: number },
+  row: number,
+  col: number,
+  flip?: { rowsReversed: boolean; colsReversed: boolean },
+): number {
+  const layout = resolveMapCellLayout(map);
+  if (!Number.isInteger(row) || !Number.isInteger(col) || row < 0 || col < 0 || row >= layout.rows || col >= layout.cols) {
+    throw new RangeError("Selection outside map dimensions");
+  }
+  const fileRow = flip?.rowsReversed ? layout.rows - 1 - row : row;
+  const fileCol = flip?.colsReversed ? layout.cols - 1 - col : col;
+  return map.address + layout.cellIndex(fileRow, fileCol) * layout.cellBytes;
+}

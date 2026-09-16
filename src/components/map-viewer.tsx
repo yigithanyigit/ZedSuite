@@ -12,7 +12,7 @@ import { useTheme } from "@/contexts/theme-context";
 import { useI18n } from "@/contexts/i18n-context";
 import { PromptModal } from "@/components/prompt-modal";
 import { isBigEndianEcu, hasUnsignedAxes } from "@/lib/ecu-endianness";
-import { resolveMapCellLayout, resolveAxisLabels, resolveAxisSources } from "@/lib/map-cell-layout";
+import { resolveMapCellLayout, resolveAxisLabels, resolveAxisSources, selectedMapCellAddress } from "@/lib/map-cell-layout";
 import { getMapValueRange, clampMapValue } from "@/lib/map-value-range";
 import { gridToText, parseGridText } from "@/lib/clipboard-grid";
 import { readSystemClipboardText, writeSystemClipboardText } from "@/lib/system-clipboard";
@@ -1705,53 +1705,6 @@ const [axesSwapped, setAxesSwapped] = useState<boolean>(false); // Track if axes
   // Ref pour stocker les dernières infos de sélection envoyées (éviter les boucles infinies)
   const lastSelectionInfoRef = useRef<string>('');
 
-  // Notifier le parent des changements de sélection (pour le curseur global)
-  useEffect(() => {
-    if (!onSelectionChange) return;
-
-    // Utiliser mapValues au lieu de displayMapValues pour éviter les re-renders
-    const rows = mapValues.length;
-    const cols = mapValues[0]?.length || 0;
-    const dimensions = `${cols}x${rows}`;
-
-    // Calculer les adresses et valeurs des cellules sélectionnées
-    const selectedCellsInfo: Array<{ row: number; col: number; address: number; value: number }> = [];
-
-    if (selectedCells.size > 0) {
-      // Taille d'une cellule en bytes: calculé depuis la taille totale / nombre de cellules
-      const totalCells = rows * cols;
-      const cellSize = totalCells > 0 ? Math.max(1, Math.floor(mapData.size / totalCells)) : 2;
-      const mapStartAddress = mapData.address;
-
-      selectedCells.forEach(cellKey => {
-        const [rowStr, colStr] = cellKey.split('-');
-        const row = parseInt(rowStr, 10);
-        const col = parseInt(colStr, 10);
-        // Calcul de l'adresse: base + (row * cols + col) * cellSize
-        const cellOffset = (row * cols + col) * cellSize;
-        const cellAddress = mapStartAddress + cellOffset;
-        selectedCellsInfo.push({ row, col, address: cellAddress, value: mapValues[row]?.[col] ?? 0 });
-      });
-    }
-
-    // Créer une clé unique pour comparer avec la dernière valeur envoyée
-    // (inclut la somme des valeurs pour rafraîchir la barre d'état après une édition)
-    const valuesSignature = selectedCellsInfo.reduce((acc, c) => acc + c.value, 0);
-    const infoKey = `${mapData.name}-${mapData.address}-${dimensions}-${selectedCells.size}-${Array.from(selectedCells).sort().join(',')}-${valuesSignature}`;
-
-    // Ne notifier que si quelque chose a vraiment changé
-    if (infoKey !== lastSelectionInfoRef.current) {
-      lastSelectionInfoRef.current = infoKey;
-      onSelectionChange({
-        mapName: mapData.name,
-        mapAddress: mapData.address,
-        dimensions,
-        selectedCount: selectedCells.size,
-        selectedCells: selectedCellsInfo,
-      });
-    }
-  }, [selectedCells, mapData.name, mapData.address, mapData.size, mapValues, onSelectionChange]);
-
   // Gestionnaires de raccourcis clavier pour + et -
   // Ne réagir que si cette map est active (au premier plan)
   useEffect(() => {
@@ -2980,6 +2933,48 @@ const [axesSwapped, setAxesSwapped] = useState<boolean>(false); // Track if axes
       yAxisIsIndex,
     };
   }, [mapData, fileData, projectName, fileName, displaySettings]);
+
+  // Notifier le parent des changements de sélection (pour le curseur global)
+  useEffect(() => {
+    if (!onSelectionChange) return;
+
+    // Utiliser mapValues au lieu de displayMapValues pour éviter les re-renders
+    const rows = mapValues.length;
+    const cols = mapValues[0]?.length || 0;
+    const dimensions = `${cols}x${rows}`;
+
+    // Calculer les adresses et valeurs des cellules sélectionnées
+    const selectedCellsInfo: Array<{ row: number; col: number; address: number; value: number }> = [];
+
+    if (selectedCells.size > 0) {
+      const layout = resolveMapCellLayout(mapData);
+      selectedCells.forEach(cellKey => {
+        const [rowStr, colStr] = cellKey.split('-');
+        const row = parseInt(rowStr, 10);
+        const col = parseInt(colStr, 10);
+        if (!Number.isInteger(row) || !Number.isInteger(col) || row < 0 || col < 0 || row >= layout.rows || col >= layout.cols) return;
+        const cellAddress = selectedMapCellAddress(mapData, row, col, extractedData ?? undefined);
+        selectedCellsInfo.push({ row, col, address: cellAddress, value: mapValues[row]?.[col] ?? 0 });
+      });
+    }
+
+    // Créer une clé unique pour comparer avec la dernière valeur envoyée
+    // (inclut la somme des valeurs pour rafraîchir la barre d'état après une édition)
+    const valuesSignature = selectedCellsInfo.reduce((acc, c) => acc + c.value, 0);
+    const infoKey = `${calibrationDefinitionKey(mapData)}-${extractedData?.rowsReversed}-${extractedData?.colsReversed}-${dimensions}-${selectedCells.size}-${Array.from(selectedCells).sort().join(',')}-${valuesSignature}`;
+
+    // Ne notifier que si quelque chose a vraiment changé
+    if (infoKey !== lastSelectionInfoRef.current) {
+      lastSelectionInfoRef.current = infoKey;
+      onSelectionChange({
+        mapName: mapData.name,
+        mapAddress: mapData.address,
+        dimensions,
+        selectedCount: selectedCells.size,
+        selectedCells: selectedCellsInfo,
+      });
+    }
+  }, [selectedCells, mapData, mapValues, extractedData, onSelectionChange]);
 
   // Reset data when map changes to prevent showing stale data
   useEffect(() => {

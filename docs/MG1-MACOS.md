@@ -70,7 +70,7 @@ in projects created with older builds to obtain the corrected metadata.
   expected bytes at 0x6BC182, from 0x0CF5 to 0x0E00 (lambda 0.875).
   This was an editor test, not a proposed calibration. The value was restored.
 - 59 standard Rust tests passed, plus the private A2L import test over stock,
-  250, 280 and 300. TypeScript and five codec/layout tests passed.
+  250, 280 and 300. TypeScript and six codec/layout tests passed.
 - A2L output matched 729 numeric parts from the independent Python workbench
   on all four binaries: addresses, types, endian flags, units and affine
   conversions had zero discrepancies. This covers supported metadata, not
@@ -144,5 +144,16 @@ Native A2L UI import was verified on the 250 reference: the 357 entries and
 cache identity includes definition metadata, preventing reuse across differing
 encodings at one address. The final native build also replaced the prior XDF tree on reimport and
 exported the unmodified 250 BIN byte-for-byte identically to its baseline.
-A2L UI edit/save/reopen checks remain to be completed; the earlier single-cell
-UI byte check used XDF.
+The A2L column-storage UI test changed one cell in `KF_POELSOLL` at
+1300 RPM / 50 degrees C from 2500 to 2601 solely as a disposable editor test.
+Only offsets 0x680E6E and 0x680E6F changed. Saving a named test version,
+restarting the app, and exporting before opening any map reproduced the
+same binary exactly. Returning to Ori exported the unchanged 250 baseline.
+The cursor address display was corrected to use the same storage layout and
+extraction mirrors as the editor; the native UI showed 0x680E6E for the
+selected test cell. No vehicle calibration was proposed or flashed.
+
+The separate WinOLS-style map-definition export still needs MG1 validation:
+its current serializer assumes 16-bit axes and does not retain all A2L
+storage metadata. The native BIN export checks above do not cover that
+auxiliary definition-export path.
