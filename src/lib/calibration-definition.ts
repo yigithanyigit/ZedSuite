@@ -1,6 +1,6 @@
 const definitionFields = [
   "address", "size", "external_source", "description", "name", "dimensions",
-  "data_type", "is_little_endian", "column_major", "rows_reversed",
+  "enum_labels", "data_type", "is_little_endian", "column_major", "rows_reversed",
   "correction_factor", "offset", "unit", "x_axis_address", "y_axis_address",
   "x_axis_encoding", "y_axis_encoding", "x_axis_correction", "y_axis_correction",
   "x_axis_offset", "y_axis_offset", "x_label", "y_label",

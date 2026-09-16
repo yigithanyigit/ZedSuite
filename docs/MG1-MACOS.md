@@ -42,8 +42,11 @@ shared axes, affine RAT_FUNC conversion, explicit byte order and ROW_DIR /
 COLUMN_DIR storage. The A2L's internal version header is stale; its header
 alone is not sufficient for matching a binary.
 
-Of 399 characteristics, 357 numeric entries import. The report lists 42
-excluded entries: 27 refer to an absent conversion, six use verbal tables,
+Of 399 characteristics, 357 numeric entries and the boolean sport-detection
+table `BMWtqe_b_SptDet4NoiseAcvn_M` import (358 total). Its cells display
+false/true; enter 0/1 to edit. Native exports retain the labels and reject
+undefined codes. These labels do not establish the downstream noise behavior.
+The report lists 41 excluded entries: 27 refer to an absent conversion, five use verbal tables,
 and nine have unresolved A2L/XDF axis-address conflicts. These exclusions
 are stored with the project and shown below the import button. Failed or
 empty imports preserve existing maps. Importing A2L replaces previously imported definitions. Importing another

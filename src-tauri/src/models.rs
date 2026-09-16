@@ -13,6 +13,8 @@ pub struct DetectedMap {
     pub unit: Option<String>,
     pub description: Option<String>,
     pub confidence: f32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enum_labels: Option<std::collections::BTreeMap<String, String>>,
     // New fields for axis addresses and correction factors
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub x_axis_encoding: Option<AxisEncoding>,
@@ -207,6 +209,7 @@ impl DetectedMap {
             unit: None,
             description: None,
             confidence: 0.0,
+            enum_labels: None,
             column_major: None,
             x_axis_encoding: None,
             y_axis_encoding: None,

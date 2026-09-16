@@ -74,6 +74,17 @@ fn validate(map: &DetectedMap, length: usize) -> Result<(), String> {
     if map.is_little_endian.is_none() {
         return Err("cell byte order is missing".into());
     }
+    if let Some(labels) = &map.enum_labels {
+        if !matches!(map.data_type, DataType::UInt8)
+            || map.correction_factor != Some(1.0)
+            || map.offset.unwrap_or(0.0) != 0.0
+            || labels.len() != 2
+            || labels.get("0").map(String::as_str) != Some("false")
+            || labels.get("1").map(String::as_str) != Some("true")
+        {
+            return Err("unsupported boolean encoding".into());
+        }
+    }
     range(map.address, rows * cols, width(&map.data_type), length)?;
     scale(map.correction_factor, map.offset)?;
     axis(
@@ -148,6 +159,28 @@ mod tests {
         assert!(validate(&map, 0x780000).is_err());
         map.correction_factor = Some(1.0);
         map.address = 0x77fffe;
+        assert!(validate(&map, 0x780000).is_err());
+    }
+
+    #[test]
+    fn boolean_definitions_reject_ambiguous_encodings() {
+        let mut map = DetectedMap::new(
+            0x680100,
+            1,
+            MapDimensions::OneDimensional { length: 1 },
+            DataType::UInt8,
+        );
+        map.is_little_endian = Some(false);
+        map.correction_factor = Some(1.0);
+        map.enum_labels = Some([("0".into(), "false".into()), ("1".into(), "true".into())].into());
+        assert!(validate(&map, 0x780000).is_ok());
+        map.correction_factor = Some(2.0);
+        assert!(validate(&map, 0x780000).is_err());
+        map.correction_factor = Some(1.0);
+        map.enum_labels
+            .as_mut()
+            .unwrap()
+            .insert("2".into(), "unknown".into());
         assert!(validate(&map, 0x780000).is_err());
     }
 

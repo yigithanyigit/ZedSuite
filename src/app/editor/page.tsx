@@ -132,6 +132,7 @@ interface MapData extends CalibrationEncoding {
   x_axis_correction?: number;
   y_axis_correction?: number;
   correction_factor?: number;
+    enum_labels?: Record<string, string>;
   offset?: number;
   x_axis_offset?: number;
   y_axis_offset?: number;

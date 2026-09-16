@@ -1144,6 +1144,7 @@ impl EDC15PDetector {
                                         map_offset, t, axis2_offset);
 
                                     let start_iq = DetectedMap {
+                                        enum_labels: None,
                                         column_major: None,
                                         x_axis_encoding: None,
                                         y_axis_encoding: None,
@@ -2043,6 +2044,7 @@ impl EDC15PDetector {
                 } else {
                     // Create new map
                     let boost_corr = DetectedMap {
+                                        enum_labels: None,
                                         column_major: None,
                                         x_axis_encoding: None,
                                         y_axis_encoding: None,
@@ -2176,6 +2178,7 @@ impl EDC15PDetector {
             }
             if !updated {
                 let iq_iat = DetectedMap {
+                                        enum_labels: None,
                                         column_major: None,
                                         x_axis_encoding: None,
                                         y_axis_encoding: None,
@@ -2290,6 +2293,7 @@ impl EDC15PDetector {
                 map_start, larger_len, smaller_len);
 
             let driver_wish = DetectedMap {
+                                        enum_labels: None,
                                         column_major: None,
                                         x_axis_encoding: None,
                                         y_axis_encoding: None,
@@ -2507,6 +2511,7 @@ impl EDC15PDetector {
                                                         };
 
                                                         let smoke_map = DetectedMap {
+                                        enum_labels: None,
                                         column_major: None,
                                         x_axis_encoding: None,
                                         y_axis_encoding: None,
@@ -2560,6 +2565,7 @@ impl EDC15PDetector {
                                 let map_addr = z_offset;
                                 if !detected_addresses.contains(&(map_addr as u32)) && map_addr + map_size <= data.len() {
                                     let smoke_map = DetectedMap {
+                                        enum_labels: None,
                                         column_major: None,
                                         x_axis_encoding: None,
                                         y_axis_encoding: None,

@@ -38,7 +38,7 @@ test('private A2L and XDF packs round-trip through the native command on all ref
         const result = invoke(`inspect_${source}`, [file, binary]);
         const maps = source === 'a2l' ? result.maps : result;
         const rejected = source === 'a2l' ? result.rejected : [];
-        assert.equal(maps.length, source === 'a2l' ? 357 : 842);
+        assert.equal(maps.length, source === 'a2l' ? 358 : 842);
         writeFileSync(packPath, serializeNativeMappack(maps, 0x780000, rejected));
         const imported = invoke('inspect_native_mappack', [packPath, binary]);
         assert.equal(imported.format, 'ZedSuite');

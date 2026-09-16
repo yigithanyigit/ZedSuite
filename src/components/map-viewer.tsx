@@ -401,6 +401,7 @@ interface MapViewerProps {
     x_axis_address?: number;
     y_axis_address?: number;
     correction_factor?: number;
+    enum_labels?: Record<string, string>;
     offset?: number;
     x_axis_correction?: number;
     y_axis_correction?: number;
@@ -1811,7 +1812,7 @@ const [axesSwapped, setAxesSwapped] = useState<boolean>(false); // Track if axes
       }
 
       if (e.key === '+' || e.key === '=' || e.key === 'Add') {
-        if (incrementDisabled) { e.preventDefault(); return; }
+        if (incrementDisabled || mapData.enum_labels) { e.preventDefault(); return; }
         e.preventDefault();
 
         // Modifier les cellules de données sélectionnées
@@ -1862,7 +1863,7 @@ const [axesSwapped, setAxesSwapped] = useState<boolean>(false); // Track if axes
           });
         }
       } else if (e.key === '-' || e.key === '_' || e.key === 'Subtract') {
-        if (incrementDisabled) { e.preventDefault(); return; }
+        if (incrementDisabled || mapData.enum_labels) { e.preventDefault(); return; }
         e.preventDefault();
 
         // Modifier les cellules de données sélectionnées
@@ -1932,6 +1933,11 @@ const [axesSwapped, setAxesSwapped] = useState<boolean>(false); // Track if axes
     if (!hasSelection) return;
 
     const { operation, value } = modifyCommand;
+    if (mapData.enum_labels && selectedCells.size > 0 &&
+        (operation !== 'fill' || !Object.hasOwn(mapData.enum_labels, String(value)))) {
+      toast({ title: "Invalid switch operation", description: "Use Fill with 0 (false) or 1 (true).", variant: "destructive" });
+      return;
+    }
 
     // Modify selected data cells
     if (selectedCells.size > 0) {
@@ -3354,7 +3360,11 @@ const [axesSwapped, setAxesSwapped] = useState<boolean>(false); // Track if axes
   };
 
   const updateCellValue = (row: number, col: number, rawNewValue: number) => {
-    const newValue = clampValue(rawNewValue);
+    if (mapData.enum_labels && !Object.hasOwn(mapData.enum_labels, String(rawNewValue))) {
+      toast({ title: "Invalid switch value", description: "Enter 0 (false) or 1 (true).", variant: "destructive" });
+      return;
+    }
+    const newValue = mapData.enum_labels ? rawNewValue : clampValue(rawNewValue);
     setMapValues((prev) => {
       const next = prev.map((r, rIdx) =>
         r.map((v, cIdx) => (rIdx === row && cIdx === col ? newValue : v)),
@@ -3376,7 +3386,7 @@ const [axesSwapped, setAxesSwapped] = useState<boolean>(false); // Track if axes
 
   const handlePromptEdit = (displayRow: number, displayCol: number, value: number) => {
     setValuePrompt({
-      title: t.mapViewer.editCellTitle,
+      title: mapData.enum_labels ? "Switch value: 0=false, 1=true" : t.mapViewer.editCellTitle,
       value: value.toFixed(2),
       onSubmit: (input: string) => {
         const parsed = Number(input.replace(",", "."));
@@ -4411,7 +4421,7 @@ const [axesSwapped, setAxesSwapped] = useState<boolean>(false); // Track if axes
                                     height: 'var(--zs-cell-h, 20px)'
                                   }}
                                 >
-                                  {value.toFixed(cellDecimals)}
+                                  {mapData.enum_labels?.[String(value)] ?? value.toFixed(cellDecimals)}
                                 </td>
                               );
                             })}
@@ -4551,7 +4561,7 @@ const [axesSwapped, setAxesSwapped] = useState<boolean>(false); // Track if axes
 
                     {/* Increase */}
                     <button
-                      disabled={incrementDisabled}
+                      disabled={incrementDisabled || !!mapData.enum_labels}
                       className={`px-3 py-1.5 text-left rounded transition-colors ${incrementDisabled ? 'opacity-40 cursor-not-allowed' : 'hover:bg-white/10'}`}
                       onClick={() => {
                         if (contextMenu.type === 'cell') {
@@ -4579,7 +4589,7 @@ const [axesSwapped, setAxesSwapped] = useState<boolean>(false); // Track if axes
 
                     {/* Decrease */}
                     <button
-                      disabled={incrementDisabled}
+                      disabled={incrementDisabled || !!mapData.enum_labels}
                       className={`px-3 py-1.5 text-left rounded transition-colors ${incrementDisabled ? 'opacity-40 cursor-not-allowed' : 'hover:bg-white/10'}`}
                       onClick={() => {
                         if (contextMenu.type === 'cell') {
@@ -4966,7 +4976,7 @@ const [axesSwapped, setAxesSwapped] = useState<boolean>(false); // Track if axes
                               height: 'var(--zs-cell-h, 20px)'
                             }}
                           >
-                            {value.toFixed(cellDecimals)}
+                            {mapData.enum_labels?.[String(value)] ?? value.toFixed(cellDecimals)}
                           </td>
                         );
                       })}
@@ -5160,7 +5170,7 @@ const [axesSwapped, setAxesSwapped] = useState<boolean>(false); // Track if axes
 
               {/* Value +1 */}
               <button
-                disabled={incrementDisabled}
+                disabled={incrementDisabled || !!mapData.enum_labels}
                 className={`px-3 py-1.5 text-left rounded transition-colors ${incrementDisabled ? 'opacity-40 cursor-not-allowed' : 'hover:bg-white/10'}`}
                 onClick={() => {
                   if (contextMenu.type === 'cell') {
@@ -5190,7 +5200,7 @@ const [axesSwapped, setAxesSwapped] = useState<boolean>(false); // Track if axes
 
               {/* Value -1 */}
               <button
-                disabled={incrementDisabled}
+                disabled={incrementDisabled || !!mapData.enum_labels}
                 className={`px-3 py-1.5 text-left rounded transition-colors ${incrementDisabled ? 'opacity-40 cursor-not-allowed' : 'hover:bg-white/10'}`}
                 onClick={() => {
                   if (contextMenu.type === 'cell') {

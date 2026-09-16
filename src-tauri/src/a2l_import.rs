@@ -172,6 +172,45 @@ fn layout_fields(
     Ok(result)
 }
 
+fn sport_detection_labels(module: &Module, name: &str) -> Result<BTreeMap<String, String>, String> {
+    let method = module
+        .compu_method
+        .get(name)
+        .ok_or("missing boolean conversion")?;
+    if method.conversion_type != ConversionType::TabVerb {
+        return Err("sport detection requires a verbal conversion".into());
+    }
+    let reference = method
+        .compu_tab_ref
+        .as_ref()
+        .ok_or("missing boolean table reference")?;
+    let table = module
+        .compu_vtab
+        .get(&reference.conversion_table)
+        .ok_or("missing boolean table")?;
+    if table.conversion_type != ConversionType::TabVerb || table.value_pairs.len() != 2 {
+        return Err("sport detection requires exactly two boolean labels".into());
+    }
+    let mut labels = BTreeMap::new();
+    for pair in &table.value_pairs {
+        let expected = if pair.in_val == 0.0 {
+            "false"
+        } else if pair.in_val == 1.0 {
+            "true"
+        } else {
+            return Err("unsupported boolean code".into());
+        };
+        if pair.out_val != expected
+            || labels
+                .insert(pair.in_val.to_string(), pair.out_val.clone())
+                .is_some()
+        {
+            return Err("invalid boolean labels".into());
+        }
+    }
+    Ok(labels)
+}
+
 fn describe(module: &Module, item: &Characteristic, bin: &[u8]) -> Result<DetectedMap, String> {
     if matches!(
         item.get_name(),
@@ -218,7 +257,27 @@ fn describe(module: &Module, item: &Characteristic, bin: &[u8]) -> Result<Detect
     let fields = layout_fields(layout, item.address, dims, bin)?;
     let value = fields.get("z").ok_or("missing values")?;
     let (width, kind) = storage(value.kind)?;
-    let conv = conversion(module, &item.conversion)?;
+    let enum_labels = if item.get_name() == "BMWtqe_b_SptDet4NoiseAcvn_M" {
+        if !matches!(kind, DataType::UInt8)
+            || bin[value.offset as usize..value.offset as usize + dims[0] * dims[1]]
+                .iter()
+                .any(|v| *v > 1)
+        {
+            return Err("sport detection contains unsupported boolean storage or values".into());
+        }
+        Some(sport_detection_labels(module, &item.conversion)?)
+    } else {
+        None
+    };
+    let conv = if enum_labels.is_some() {
+        Conversion {
+            factor: 1.0,
+            offset: 0.0,
+            units: "0=false, 1=true".into(),
+        }
+    } else {
+        conversion(module, &item.conversion)?
+    };
     let mut map = DetectedMap::new(
         value.offset,
         width * dims[0] * dims[1],
@@ -235,6 +294,7 @@ fn describe(module: &Module, item: &Characteristic, bin: &[u8]) -> Result<Detect
     map.subcategory = map.category.clone();
     map.is_little_endian = Some(false);
     map.column_major = Some(layout.fnc_values.as_ref().unwrap().index_mode == IndexMode::ColumnDir);
+    map.enum_labels = enum_labels;
     map.unit = Some(conv.units);
     map.correction_factor = Some(conv.factor);
     map.offset = Some(conv.offset);
@@ -414,8 +474,8 @@ mod tests {
                 Some(STANDARD.encode(&binary)),
             )
             .unwrap();
-            assert_eq!(result.maps.len(), 357);
-            assert_eq!(result.rejected.len(), 42);
+            assert_eq!(result.maps.len(), 358);
+            assert_eq!(result.rejected.len(), 41);
             assert!(
                 result
                     .maps
@@ -424,6 +484,31 @@ mod tests {
                     .count()
                     == 3
             );
+            let sport = result
+                .maps
+                .iter()
+                .find(|map| map.description.as_deref() == Some("BMWtqe_b_SptDet4NoiseAcvn_M"))
+                .unwrap();
+            assert_eq!(sport.address, 0x6c1fb8);
+            assert_eq!(sport.size, 48);
+            assert_eq!(sport.column_major, Some(false));
+            assert_eq!(
+                sport.enum_labels.as_ref().unwrap().get("0").unwrap(),
+                "false"
+            );
+            assert_eq!(
+                sport.enum_labels.as_ref().unwrap().get("1").unwrap(),
+                "true"
+            );
+            assert_eq!(sport.x_axis_address, Some(0x6c1ff8));
+            assert_eq!(sport.y_axis_address, Some(0x6c1ff4));
+            let mut invalid = binary.clone();
+            invalid[0x6c1fb8] = 2;
+            let rejected = parse_reference(&data, &invalid).unwrap();
+            assert!(rejected
+                .rejected
+                .iter()
+                .any(|reason| reason.starts_with("BMWtqe_b_SptDet4NoiseAcvn_M:")));
             let lambda = result
                 .maps
                 .iter()

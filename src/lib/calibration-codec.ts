@@ -1,5 +1,6 @@
 export interface CalibrationEncoding {
   data_type?: string;
+  enum_labels?: Record<string, string>;
   is_little_endian?: boolean;
 }
 
@@ -35,6 +36,7 @@ export function writeCalibrationCell(data: Uint8Array, address: number, encoding
   if (!Number.isInteger(address) || address < 0 || address + size > data.length) throw new Error("Calibration address outside binary");
   if (![value, factor, offset].every(Number.isFinite) || factor === 0) throw new Error("Invalid calibration conversion");
   let raw = (value - offset) / factor;
+  if (encoding.enum_labels && (!Number.isInteger(raw) || !Object.hasOwn(encoding.enum_labels, String(raw)))) throw new Error("Choose a defined code: 0=false, 1=true");
   if (encoding.data_type !== "Float32") {
     raw = Math.round(raw);
     const signed = encoding.data_type?.startsWith("Int");
