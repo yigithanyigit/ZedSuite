@@ -575,6 +575,7 @@ export function CompareModal({
   const [selectedVersion1, setSelectedVersion1] = useState<string>("");
   const [selectedVersion2, setSelectedVersion2] = useState<string>("");
   const [isComparing, setIsComparing] = useState(false);
+  const [comparisonError, setComparisonError] = useState<string | null>(null);
 
   // Compare view state
   const [showCompareView, setShowCompareView] = useState(false);
@@ -684,11 +685,7 @@ export function CompareModal({
     // Chemin fiable : reconstruction par le parent (corrections effectives,
     // dé-flip des coordonnées, modifs binaires, fichiers importés)
     if (resolveVersionData) {
-      try {
-        return await resolveVersionData(versionId);
-      } catch (error) {
-        console.error("resolveVersionData error, falling back:", error);
-      }
+      return await resolveVersionData(versionId);
     }
 
     const version = versions.find(v => v.id === versionId);
@@ -804,6 +801,8 @@ export function CompareModal({
     if (!selectedVersion1 || !selectedVersion2) return;
 
     setIsComparing(true);
+    setComparisonError(null);
+    setShowCompareView(false);
     try {
       const [data1, data2] = await Promise.all([
         loadVersionData(selectedVersion1),
@@ -819,6 +818,7 @@ export function CompareModal({
       setShowCompareView(true);
     } catch (error) {
       console.error("Error comparing versions:", error);
+      setComparisonError("Comparison failed: " + String(error));
     } finally {
       setIsComparing(false);
     }
@@ -1363,6 +1363,7 @@ export function CompareModal({
               />
             </div>
 
+            {comparisonError && <p role="alert" className="text-sm text-red-400">{comparisonError}</p>}
             {/* Buttons */}
             <div className="flex gap-2 mt-2">
               <button

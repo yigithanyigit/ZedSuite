@@ -100,3 +100,20 @@ Local builds are ad-hoc signed, not notarized distribution releases.
 
 The linked Cartelematics DME_8C0 listing describes a BMW 760Li V12, not this
 B48/DME8.4 reference. Matching the MG1CS003 family name alone is insufficient.
+
+## Follow-up audit
+
+A comparison of 734 numeric parts covered by the existing hash-pinned
+A2L/XDF workbench found 116 parts with metadata discrepancies after fixing
+constant-unit import: 100 unit-text differences, 15 conversion differences,
+and three storage-type disagreements (categories overlap). Unit-text
+inequality includes notation differences and is not automatically a physical
+unit error. The three `EngDa_*` constants are declared float32 by the A2L but
+signed int32 by the XDF. They must not be treated as verified editable
+calibrations until the definitions are reconciled.
+
+Version reconstruction now propagates failures to a visible comparison error
+instead of returning partial data or attempting a raw-value fallback. Copying
+imported maps uses their explicit storage encoding, including signed and
+32-bit values. The audit script/report remain in the local analysis workspace;
+vehicle data and definition files are not redistributed with the fork.

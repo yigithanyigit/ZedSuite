@@ -3293,6 +3293,7 @@ function EditorPageContent() {
       applyEditsToFileData(data, mods, axisEdits, flips);
     } catch (error) {
       console.error("buildVersionFileData error", error);
+      throw error;
     }
     return Array.from(data);
   }, [versions, projectData, applyEditsToFileData]);
@@ -4676,9 +4677,11 @@ function EditorPageContent() {
       const b0 = projectData.file_data[byteAddress] || 0;
       const b1 = projectData.file_data[byteAddress + 1] || 0;
       const isLE = (mapInfo as { is_little_endian?: boolean }).is_little_endian === true;
-      const raw = cellSize >= 2
-        ? ((!isLE && ecuBigEndian) ? ((b0 << 8) | b1) : ((b1 << 8) | b0))
-        : b0;
+      const raw = mapInfo.external_source
+        ? readCalibrationCell(projectData.file_data, byteAddress, mapInfo)
+        : cellSize >= 2
+          ? ((!isLE && ecuBigEndian) ? ((b0 << 8) | b1) : ((b1 << 8) | b0))
+          : b0;
       const { correction, offset } = getCellCorrections(mapInfo);
       return raw * correction + offset;
     };

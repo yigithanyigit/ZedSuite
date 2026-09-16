@@ -431,6 +431,9 @@ pub fn parse_xdf(xml: &str, rom_len: u32) -> Vec<DetectedMap> {
                     match (target, in_axis) {
                         ("title", false) => tbl.title = t,
                         ("description", false) => tbl.description = t,
+                        ("units", false) if tbl.constant => {
+                            axis_slot(tbl, "z").units = t;
+                        }
                         ("units", true) => {
                             let ax = axis_slot(tbl, &axis_id);
                             ax.units = t;
@@ -809,6 +812,7 @@ mod tests {
         assert!(matches!(c.data_type, DataType::Int8)); // flags 0x03 = signed + LSB first
         assert_eq!(c.category.as_deref(), Some("Fueling"));
         assert!((c.correction_factor.unwrap() - 40.0).abs() < 1e-12);
+        assert_eq!(c.unit.as_deref(), Some("rpm"));
     }
 
     #[test]
